@@ -87,7 +87,6 @@ function SL({label,val,min,max,step,set,fmt}){
 }
 
 function App(){
-  const[b0,setB0]=useState(0.75);
   const[eta,setEta]=useState(0.05);
   const[ocr,setOcr]=useState(15);
   const[ds,setDs]=useState(80);
@@ -127,7 +126,6 @@ function App(){
     React.createElement('div',{className:'layout'},
       React.createElement('div',{className:'card'},
         React.createElement('div',{className:'section-label'},'Input parameters'),
-        React.createElement(SL,{label:'Initial bond strength b\u2080',val:b0,min:0.5,max:1.0,step:0.05,set:setB0,fmt:v=>v.toFixed(2)}),
         React.createElement(SL,{label:'Fissure density \u03b7',val:eta,min:0.01,max:0.20,step:0.01,set:setEta,fmt:v=>v.toFixed(2)}),
         React.createElement(SL,{label:'Overconsolidation ratio (OCR)',val:ocr,min:2,max:30,step:1,set:setOcr}),
         React.createElement(SL,{label:'Suction amplitude \u0394s (kPa)',val:ds,min:10,max:200,step:10,set:setDs}),
@@ -144,30 +142,30 @@ function App(){
               React.createElement(XAxis,{dataKey:'cycle',tick:{fontSize:11,fill:TICK},label:{value:'Wetting-drying cycle',position:'insideBottom',offset:-12,fontSize:11,fill:TICK}}),
               React.createElement(YAxis,{domain:[0,1],tickFormatter:v=>v.toFixed(1),tick:{fontSize:11,fill:TICK},label:{value:'P(destructuration)',angle:-90,position:'insideLeft',offset:14,fontSize:11,fill:TICK}}),
               React.createElement(Tooltip,{contentStyle:{background:'#222220',border:'1px solid #3a3a38',borderRadius:6,fontSize:12},formatter:v=>[v.toFixed(3),'P'],labelFormatter:l=>'Cycle '+l}),
-              React.createElement(ReferenceLine,{y:0.5,stroke:'#666',strokeDasharray:'5 4',label:{value:'P\u202f=\u202f0.50',position:'insideTopRight',fontSize:10,fill:'#888'}}),
+              React.createElement(ReferenceLine,{y:0.5,stroke:'#666',strokeDasharray:'5 4',label:{value:'P = 0.50',position:'insideTopRight',fontSize:10,fill:'#888'}}),
               React.createElement(Line,{type:'monotone',dataKey:'probability',stroke:'#5a9ee0',strokeWidth:2,dot:false})
             )
           )
         ),
         result&&React.createElement('div',{className:'card'},
-          React.createElement('div',{className:'section-label'},'Parameter sensitivity \u2014 Spearman rank correlation with destructuration cycle'),
+          React.createElement('div',{className:'section-label'},'Parameter sensitivity — Spearman rank correlation with destructuration cycle'),
           React.createElement(ResponsiveContainer,{width:'100%',height:220},
             React.createElement(BarChart,{data:result.tornadoData,layout:'vertical',margin:{top:4,right:40,left:90,bottom:4}},
               React.createElement(CartesianGrid,{strokeDasharray:'3 3',stroke:GRID,horizontal:false}),
               React.createElement(XAxis,{type:'number',domain:[-1,1],tickFormatter:v=>v.toFixed(1),tick:{fontSize:11,fill:TICK}}),
               React.createElement(YAxis,{type:'category',dataKey:'name',tick:{fontSize:11,fill:TICK},width:86}),
-              React.createElement(Tooltip,{contentStyle:{background:'#222220',border:'1px solid #3a3a38',borderRadius:6,fontSize:12},formatter:v=>[v.toFixed(3),'Spearman \u03c1']}),
+              React.createElement(Tooltip,{contentStyle:{background:'#222220',border:'1px solid #3a3a38',borderRadius:6,fontSize:12},formatter:v=>[v.toFixed(3),'Spearman rho']}),
               React.createElement(ReferenceLine,{x:0,stroke:'#666'}),
               React.createElement(Bar,{dataKey:'correlation'},
                 result.tornadoData.map((e,i)=>React.createElement(Cell,{key:i,fill:e.correlation>0?'#e06c6c':'#5a9ee0'}))
               )
             )
           ),
-          React.createElement('p',{className:'legend-note'},'Red \u2192 risk-increasing (higher value = earlier destructuration) \u00b7 Blue \u2192 risk-reducing')
+          React.createElement('p',{className:'legend-note'},'Red: risk-increasing (higher value = earlier destructuration) | Blue: risk-reducing')
         ),
         result&&React.createElement('div',{className:'summary-grid'},
           React.createElement('div',{className:'metric'},
-            React.createElement('div',{className:'lbl'},'P(destructuration \u2264 50 cycles)'),
+            React.createElement('div',{className:'lbl'},'P(destructuration within 50 cycles)'),
             React.createElement('div',{className:'val '+(result.pFail>0.5?'danger':'')},(result.pFail*100).toFixed(1)+'%')
           ),
           React.createElement('div',{className:'metric'},
@@ -182,7 +180,7 @@ function App(){
       )
     ),
     React.createElement('footer',null,
-      '\u0394b = \u2212\u03be \u00b7 b \u00b7 \u03b7 \u00b7 (\u0394s / (p\u2090\u2091\u2092 + s\u2080)) \u00b7 OCR\u207b\u1da8s \u00b7 Threshold: b \u2264 0.05 \u00b7 S-CLAY1S framework (Wheeler et al. 2003)'
+      'Degradation law: db = -xi * b * eta * (ds/(pref+s0)) * OCR^(-ks) | Threshold: b <= 0.05 | S-CLAY1S framework (Wheeler et al. 2003)'
     )
   );
 }
