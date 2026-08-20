@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Probabilistic Destructuration Analyser — Structured Clays</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+body{background:#0f0f0e;color:#f0efec;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:14px;line-height:1.6;min-height:100vh;padding:2rem 1.5rem 4rem;}
+h1{font-size:20px;font-weight:600;margin-bottom:4px;}
+.subtitle{font-size:12px;color:#c3c2b7;margin-bottom:2rem;padding-bottom:1rem;border-bottom:1px solid #2c2c2a;}
+.subtitle a{color:#5a9ee0;}
+.layout{display:grid;grid-template-columns:260px 1fr;gap:20px;align-items:start;}
+@media(max-width:700px){.layout{grid-template-columns:1fr;}}
+.card{background:#1a1a19;border:1px solid #2c2c2a;border-radius:10px;padding:1.25rem;margin-bottom:16px;}
+.sec{font-size:10px;font-weight:700;letter-spacing:.08em;color:#898781;text-transform:uppercase;margin-bottom:14px;}
+.sr{margin-bottom:16px;}
+.sr-top{display:flex;justify-content:space-between;margin-bottom:4px;}
+.sr-lbl{font-size:12px;color:#c3c2b7;}
+.sr-val{font-size:12px;font-weight:700;font-family:monospace;color:#f0efec;}
+input[type=range]{width:100%;accent-color:#2a78d6;cursor:pointer;margin-top:2px;}
+button{width:100%;padding:10px;margin-top:8px;background:#2a78d6;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;}
+button:hover{opacity:.85;}
+button:disabled{opacity:.4;cursor:not-allowed;}
+.placeholder{text-align:center;color:#898781;padding:3rem 1rem;font-size:13px;}
+canvas{display:block;width:100%;border-radius:6px;}
+.chart-title{font-size:11px;color:#c3c2b7;margin-bottom:8px;}
+.metrics{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:4px;}
+@media(max-width:500px){.metrics{grid-template-columns:1fr;}}
+.metric{background:#222220;border:1px solid #2c2c2a;border-radius:8px;padding:.9rem;}
+.ml{font-size:11px;color:#c3c2b7;margin-bottom:4px;}
+.mv{font-size:20px;font-weight:700;font-family:monospace;}
+.mv.danger{color:#e06c6c;}
+.mt{font-size:13px;font-weight:600;}
+.legend{font-size:11px;color:#898781;margin-top:6px;}
+footer{margin-top:2rem;padding-top:1rem;border-top:1px solid #2c2c2a;font-size:11px;color:#898781;}
+</style>
+</head>
+<body>
+<h1>Probabilistic Destructuration Analyser</h1>
+<div class="subtitle">S-CLAY1S bond degradation &middot; Monte Carlo N=1000 &middot; <a href="https://doi.org/10.1680/geot.2003.53.4.341" target="_blank">Wheeler et al. 2003</a></div>
+
+<div class="layout">
+  <div>
+    <div class="card">
+      <div class="sec">Input Parameters</div>
+      <div class="sr">
+        <div class="sr-top"><span class="sr-lbl">Fissure density &eta;</span><span class="sr-val" id="v-eta">0.05</span></div>
+        <input type="range" id="s-eta" min="0.01" max="0.20" step="0.01" value="0.05">
+      </div>
+      <div class="sr">
+        <div class="sr-top"><span class="sr-lbl">Overconsolidation ratio (OCR)</span><span class="sr-val" id="v-ocr">15</span></div>
+        <input type="range" id="s-ocr" min="2" max="30" step="1" value="15">
+      </div>
+      <div class="sr">
+        <div class="sr-top"><span class="sr-lbl">Suction amplitude &Delta;s (kPa)</span><span class="sr-val" id="v-ds">80</span></div>
+        <input type="range" id="s-ds" min="10" max="200" step="10" value="80">
+      </div>
+      <button id="run-btn" onclick="runAnalysis()">Run Monte Carlo (N = 1000)</button>
+    </div>
+  </div>
+
+  <div id="output">
+    <div class="card"><div class="placeholder">Set parameters and click Run to see results.</div></div>
+  </div>
+</div>
+
+<footer>&Delta;b = &minus;&xi; &middot; b &middot; &eta; &middot; (&Delta;s / (p<sub>ref</sub>+s<sub>0</sub>)) &middot; OCR<sup>&minus;&kappa;s</sup> &nbsp;|&nbsp; Threshold: b &le; 0.05 &nbsp;|&nbsp; S-CLAY1S framework (Wheeler et al. 2003)</footer>
+
+<script>
+// Slider live update
+['eta','ocr','ds'].forEach(k=>{
+  document.getElementById('s-'+k).addEventListener('input',function(){
+    document.getElementById('v-'+k).textContent=parseFloat(this.value).toFixed(k==='eta'?2:0);
+  });
+});
+
+// RNG helpers
+function randn(){
+  let u=0,v=0;
+  while(u===0)u=Math.random();
+  while(v===0)v=Math.random();
+  return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v);
+}
+function lognormal(mean,cv){
+  const s2=Math.log(1+cv*cv);
+  return Math.exp(Math.log(mean)-s2/2+Math.sqrt(s2)*randn());
+}
+function truncNorm(mean,std){
+  let v;do{v=mean+std*randn();}while(v<=0);return v;
+}
+function beta22(lo,hi){
+  let x,y;
+  do{x=Math.random()+1e-12;y=Math.random()+1e-12;}
+  while(Math.pow(x,0.5)+Math.pow(y,0.5)>1);
+  const b=Math.pow(x,0.5)/(Math.pow(x,0.5)+Math.pow(y,0.5));
+  return lo+b*(hi-lo);
+}
+function ranks(arr){
+  const s=[...arr].map((v,i)=>[v,i]).sort((a,b)=>a[0]-b[0]);
+  const r=new Array(arr.length);
+  s.forEach(([,i],rank)=>r[i]=rank+1);
+  return r;
+}
+function spearman(x,y){
+  const n=x.length,rx=ranks(x),ry=ranks(y);
+  let d2=0;for(let i=0;i<n;i++)d2+=(rx[i]-ry[i])**2;
+  return 1-(6*d2)/(n*(n*n-1));
+}
+
+function runAnalysis(){
+  const btn=document.getElementById('run-btn');
+  btn.disabled=true;btn.textContent='Running…';
+  setTimeout(()=>{
+    const eta=+document.getElementById('s-eta').value;
+    const ocr=+document.getElementById('s-ocr').value;
+    const ds=+document.getElementById('s-ds').value;
+    const N=1000,MAX=50,b_crit=0.05,p_ref=100,s0=50,ks=0.3,xi_m=10;
+    const ctf=new Array(N).fill(MAX+1);
+    const sp={b0:[],eta:[],ocr:[],ds:[],xi:[]};
+    for(let i=0;i<N;i++){
+      const _b0=beta22(0.5,1.0);
+      const _eta=lognormal(eta,0.25);
+      const _ocr=lognormal(ocr,0.15);
+      const _ds=truncNorm(ds,ds*0.2);
+      const _xi=lognormal(xi_m,0.3);
+      sp.b0.push(_b0);sp.eta.push(_eta);sp.ocr.push(_ocr);sp.ds.push(_ds);sp.xi.push(_xi);
+      let b=_b0;
+      for(let c=1;c<=MAX;c++){
+        const dep=_eta*(_ds/(p_ref+s0))*Math.pow(_ocr,-ks);
+        b=Math.max(0,b-_xi*b*dep);
+        if(b<=b_crit){ctf[i]=c;break;}
+      }
+    }
+    // Prob curve
+    const prob=[];
+    for(let c=1;c<=MAX;c++) prob.push(ctf.filter(v=>v<=c).length/N);
+    // Tornado
+    const keys=['b0','eta','ocr','ds','xi'];
+    const lbls=['Bond index b\u2080','Fissure density \u03b7','OCR','Suction \u0394s','Rate \u03be'];
+    const corrs=keys.map((k,i)=>({name:lbls[i],r:spearman(sp[k],ctf)}));
+    corrs.sort((a,b)=>Math.abs(b.r)-Math.abs(a.r));
+    const failed=ctf.filter(v=>v<=MAX).sort((a,b)=>a-b);
+    const pFail=failed.length/N;
+    const med=failed.length>0?failed[Math.floor(failed.length/2)]:null;
+    const top=corrs[0].name;
+    renderOutput(prob,corrs,pFail,med,top);
+    btn.disabled=false;btn.textContent='Run Monte Carlo (N = 1000)';
+  },20);
+}
+
+function renderOutput(prob,corrs,pFail,med,top){
+  const out=document.getElementById('output');
+  out.innerHTML=`
+    <div class="card">
+      <div class="chart-title">Probability of full destructuration vs. wetting-drying cycles</div>
+      <canvas id="c-prob" height="200"></canvas>
+    </div>
+    <div class="card">
+      <div class="chart-title">Parameter sensitivity &mdash; Spearman rank correlation with destructuration cycle</div>
+      <canvas id="c-torn" height="180"></canvas>
+      <div class="legend">Red: risk-increasing &nbsp;|&nbsp; Blue: risk-reducing</div>
+    </div>
+    <div class="metrics">
+      <div class="metric"><div class="ml">P(destructuration &le; 50 cycles)</div><div class="mv ${pFail>0.5?'danger':''}">${(pFail*100).toFixed(1)}%</div></div>
+      <div class="metric"><div class="ml">Median cycle to destructuration</div><div class="mv">${med!==null?med:'&gt; 50'}</div></div>
+      <div class="metric"><div class="ml">Most influential parameter</div><div class="mt">${top}</div></div>
+    </div>
+  `;
+  drawLineChart('c-prob',prob);
+  drawTornado('c-torn',corrs);
+}
+
+function drawLineChart(id,prob){
+  const canvas=document.getElementById(id);
+  const W=canvas.offsetWidth||700,H=200;
+  canvas.width=W;canvas.height=H;
+  const ctx=canvas.getContext('2d');
+  const pad={t:10,r:20,b:35,l:45};
+  const cw=W-pad.l-pad.r,ch=H-pad.t-pad.b;
+  ctx.fillStyle='#1a1a19';ctx.fillRect(0,0,W,H);
+  // Grid
+  ctx.strokeStyle='#2c2c2a';ctx.lineWidth=1;
+  [0,.25,.5,.75,1].forEach(v=>{
+    const y=pad.t+ch*(1-v);
+    ctx.beginPath();ctx.moveTo(pad.l,y);ctx.lineTo(pad.l+cw,y);ctx.stroke();
+    ctx.fillStyle='#898781';ctx.font='10px sans-serif';ctx.textAlign='right';
+    ctx.fillText(v.toFixed(2),pad.l-6,y+4);
+  });
+  [0,10,20,30,40,50].forEach(v=>{
+    const x=pad.l+cw*v/50;
+    ctx.beginPath();ctx.moveTo(x,pad.t);ctx.lineTo(x,pad.t+ch);ctx.stroke();
+    ctx.fillStyle='#898781';ctx.font='10px sans-serif';ctx.textAlign='center';
+    ctx.fillText(v,x,pad.t+ch+16);
+  });
+  // P=0.5 ref
+  ctx.strokeStyle='#555';ctx.setLineDash([5,4]);
+  const ry=pad.t+ch*0.5;
+  ctx.beginPath();ctx.moveTo(pad.l,ry);ctx.lineTo(pad.l+cw,ry);ctx.stroke();
+  ctx.setLineDash([]);
+  // Line
+  ctx.strokeStyle='#5a9ee0';ctx.lineWidth=2;
+  ctx.beginPath();
+  prob.forEach((v,i)=>{
+    const x=pad.l+cw*i/49,y=pad.t+ch*(1-v);
+    i===0?ctx.moveTo(x,y):ctx.lineTo(x,y);
+  });
+  ctx.stroke();
+  // Axis labels
+  ctx.fillStyle='#898781';ctx.font='11px sans-serif';
+  ctx.textAlign='center';ctx.fillText('Wetting-drying cycle',pad.l+cw/2,H-2);
+  ctx.save();ctx.translate(12,pad.t+ch/2);ctx.rotate(-Math.PI/2);
+  ctx.fillText('P(destructuration)',0,0);ctx.restore();
+}
+
+function drawTornado(id,corrs){
+  const canvas=document.getElementById(id);
+  const W=canvas.offsetWidth||700,H=180;
+  canvas.width=W;canvas.height=H;
+  const ctx=canvas.getContext('2d');
+  const pad={t:8,r:20,b:20,l:110};
+  const cw=W-pad.l-pad.r,ch=H-pad.t-pad.b;
+  ctx.fillStyle='#1a1a19';ctx.fillRect(0,0,W,H);
+  const n=corrs.length,bh=Math.floor(ch/n)-6,mid=pad.l+cw/2;
+  // Zero line
+  ctx.strokeStyle='#555';ctx.lineWidth=1;
+  ctx.beginPath();ctx.moveTo(mid,pad.t);ctx.lineTo(mid,pad.t+ch);ctx.stroke();
+  // Axis ticks
+  [-1,-.5,0,.5,1].forEach(v=>{
+    const x=mid+v*cw/2;
+    ctx.strokeStyle='#2c2c2a';
+    ctx.beginPath();ctx.moveTo(x,pad.t);ctx.lineTo(x,pad.t+ch);ctx.stroke();
+    ctx.fillStyle='#898781';ctx.font='10px sans-serif';ctx.textAlign='center';
+    ctx.fillText(v.toFixed(1),x,pad.t+ch+14);
+  });
+  corrs.forEach((c,i)=>{
+    const y=pad.t+i*(bh+6)+3;
+    const barW=Math.abs(c.r)*cw/2;
+    const x=c.r>=0?mid:mid-barW;
+    ctx.fillStyle=c.r>=0?'#c0504d':'#4472c4';
+    ctx.fillRect(x,y,barW,bh);
+    ctx.fillStyle='#c3c2b7';ctx.font='11px sans-serif';ctx.textAlign='right';
+    ctx.fillText(c.name,pad.l-6,y+bh/2+4);
+    ctx.fillStyle='#f0efec';ctx.font='10px monospace';
+    ctx.textAlign=c.r>=0?'left':'right';
+    const lx=c.r>=0?mid+barW+4:mid-barW-4;
+    ctx.fillText(c.r.toFixed(2),lx,y+bh/2+4);
+  });
+}
+</script>
+</body>
+</html>
