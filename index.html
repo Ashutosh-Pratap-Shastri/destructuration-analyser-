@@ -38,7 +38,7 @@ footer{margin-top:2rem;padding-top:1rem;border-top:1px solid #2c2c2a;font-size:1
 </head>
 <body>
 <h1>Probabilistic Destructuration Analyser</h1>
-<div class="subtitle">S-CLAY1S bond degradation &middot; Monte Carlo N=1000 &middot; <a href="https://doi.org/10.1680/geot.2003.53.4.341" target="_blank">Wheeler et al. 2003</a></div>
+<div class="subtitle">S-CLAY1S-inspired bond degradation &middot; Monte Carlo N=1000, 5 uncertain parameters &middot; after S-CLAY1 (Wheeler et al. 2003) and S-CLAY1S (<a href="https://doi.org/10.1061/(ASCE)1532-3641(2005)5:2(87)" target="_blank">Karstunen et al. 2005</a>)</div>
 
 <div class="layout">
   <div>
@@ -65,7 +65,7 @@ footer{margin-top:2rem;padding-top:1rem;border-top:1px solid #2c2c2a;font-size:1
   </div>
 </div>
 
-<footer>&Delta;b = &minus;&xi; &middot; b &middot; &eta; &middot; (&Delta;s / (p<sub>ref</sub>+s<sub>0</sub>)) &middot; OCR<sup>&minus;&kappa;s</sup> &nbsp;|&nbsp; Threshold: b &le; 0.05 &nbsp;|&nbsp; S-CLAY1S framework (Wheeler et al. 2003)</footer>
+<footer>Phenomenological per-cycle rule inspired by the S-CLAY1S destructuration concept (Karstunen et al. 2005): &Delta;b = &minus;&xi; &middot; b &middot; &eta; &middot; (&Delta;s / (p<sub>ref</sub>+s<sub>0</sub>)) &middot; OCR<sup>&minus;&kappa;s</sup> &nbsp;|&nbsp; p<sub>ref</sub> = 100 kPa, s<sub>0</sub> = 50 kPa, &kappa;s = 0.3 &nbsp;|&nbsp; Threshold: b &le; 0.05 &nbsp;|&nbsp; In S-CLAY1S itself, bonding degrades with plastic volumetric and deviatoric strain; this tool is an exploratory sensitivity model, not a calibrated constitutive model.</footer>
 
 <script>
 // Slider live update
@@ -159,7 +159,7 @@ function renderOutput(prob,corrs,pFail,med,top){
     <div class="card">
       <div class="chart-title">Parameter sensitivity &mdash; Spearman rank correlation with destructuration cycle</div>
       <canvas id="c-torn" height="180"></canvas>
-      <div class="legend">Red: risk-increasing &nbsp;|&nbsp; Blue: risk-reducing</div>
+      <div class="legend">Red (negative correlation): brings destructuration earlier, risk-increasing &nbsp;|&nbsp; Blue (positive correlation): delays it, risk-reducing</div>
     </div>
     <div class="metrics">
       <div class="metric"><div class="ml">P(destructuration &le; 50 cycles)</div><div class="mv ${pFail>0.5?'danger':''}">${(pFail*100).toFixed(1)}%</div></div>
@@ -237,7 +237,7 @@ function drawTornado(id,corrs){
     const y=pad.t+i*(bh+6)+3;
     const barW=Math.abs(c.r)*cw/2;
     const x=c.r>=0?mid:mid-barW;
-    ctx.fillStyle=c.r>=0?'#c0504d':'#4472c4';
+    ctx.fillStyle=c.r>=0?'#4472c4':'#c0504d';
     ctx.fillRect(x,y,barW,bh);
     ctx.fillStyle='#c3c2b7';ctx.font='11px sans-serif';ctx.textAlign='right';
     ctx.fillText(c.name,pad.l-6,y+bh/2+4);
